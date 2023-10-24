@@ -7,10 +7,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <netdb.h>
 
 #define MSG_MAX_LEN 1024
-#define PORT1 6060
-#define PORT2 6001
+#define PORT1 6001
+#define PORT2 6060
 
 int socketDescriptor1, socketDescriptor2;
 
@@ -40,9 +41,19 @@ void* sendThread(void* args) {
             break;
         }
 
+        struct addrinfo hints, *res;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+        
+        
+
+      
         struct sockaddr_in sinRemote;
-        sinRemote.sin_family = AF_INET;
-        inet_pton(AF_INET, "127.0.0.1", &sinRemote.sin_addr);
+        getaddrinfo("asb9838nu-e08",NULL, &hints, &res);
+        memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
+        // sinRemote.sin_family = AF_INET;
+        // inet_pton(AF_INET, , &sinRemote.sin_addr);
         sinRemote.sin_port = htons(socketDescriptor == socketDescriptor1 ? PORT2 : PORT1);
 
         sendto(socketDescriptor, messageTx, strlen(messageTx), 0, (struct sockaddr*) &sinRemote, sizeof(sinRemote));
