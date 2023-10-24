@@ -94,7 +94,7 @@ void *udp_send_thread(void *arg) {
     // ... (Initialize sinRemote using data from arg)
     memset(&sinRemote, 0, sizeof(sinRemote));
     sinRemote.sin_family = AF_INET;
-    sinRemote.sin_addr.s_addr = htonl(INADDR_ANY);
+    sinRemote.sin_addr.s_addr = htonl("127.0.0.53");
     sinRemote.sin_port = htons(PORT);
     int socketDescriptor = socket(PF_INET, SOCK_DGRAM, 0);
 
