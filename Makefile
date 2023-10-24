@@ -1,10 +1,10 @@
 all: x
 
-x: main.o
-	g++ -Wall -o x main.o
+x: alter_main.o
+	g++ -Wall -o x alter_main.o
 	
-main.o: main.c
-	g++ -Wall -o main.o -c main.c
+main.o: alter_main.c
+	g++ -Wall -o alter_main.o -c alter_main.c
 	
 clean:
 	rm -f x *.o 
