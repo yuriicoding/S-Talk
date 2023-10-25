@@ -11,8 +11,8 @@
 #include "list.h"
 
 #define MSG_MAX_LEN 1024
-#define PORT1 6060
-#define PORT2 6001
+#define PORT1 6001
+#define PORT2 6060
 
 List* send_list;
 List* display_list;
@@ -31,7 +31,7 @@ void* keyboardInputThread(void* args) {
     char* message = (char*)malloc(MSG_MAX_LEN);
     while (1) {
 
-        printf("Enter a message to send (or type 'q' to quit): ");
+        
         fgets(message, MSG_MAX_LEN, stdin);
         char* messageToSave = strdup(message); 
         List_append(send_list, messageToSave);
@@ -88,9 +88,7 @@ void* sendThread(void* args) {
 
         pthread_mutex_lock(&sendMutex);
         {
-            while (List_count(send_list) == 0){
                 pthread_cond_wait(&sendCondVar, &sendMutex);
-            }
                 
         }
         pthread_mutex_unlock(&sendMutex);
@@ -113,7 +111,7 @@ void* sendThread(void* args) {
 
         
             struct sockaddr_in sinRemote;
-            getaddrinfo("asb9838nu-e07",NULL, &hints, &res);
+            getaddrinfo("cs-srye4013ue02",NULL, &hints, &res);
             memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
             // sinRemote.sin_family = AF_INET;
             // inet_pton(AF_INET, , &sinRemote.sin_addr);
@@ -124,9 +122,6 @@ void* sendThread(void* args) {
 
 
     }
-
-    close(socketDescriptor);
-    pthread_cancel(pthread_self());
 
     return NULL;
 }
@@ -140,10 +135,11 @@ void* screenOutputThread(void* args) {
             pthread_cond_wait(&receiveCondVar, &receiveMutex);
         }
         pthread_mutex_unlock(&receiveMutex);
-
+        printf("\nReceived: ");
         char* message = (char*)List_trim(display_list);
         if (message) {
-            printf("%s", message);
+            fputs(message, stdout);
+            fputs("\n", stdout);
             free(message); // Free the memory after displaying the message
         }
     }
@@ -184,7 +180,9 @@ int main() {
     pthread_join(receiveThreadPID1, NULL);
     pthread_join(screen_output, NULL);
 
-    
+
+    close(socketDescriptor1);
+
     List_free(send_list, free);
     List_free(display_list, free);
 
