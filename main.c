@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include "List.h"
+#include "list.h"
 
 #define MSG_MAX_LEN 1024
 #define PORT1 6001
