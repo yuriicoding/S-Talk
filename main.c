@@ -60,15 +60,17 @@ void* keyboardInputThread(void* args) {
 void* receiveThread(void* args) {   
     int socketDescriptor = *((int*)args);
     // char messageRx[MSG_MAX_LEN];
-    char* messageRx = (char*)malloc(MSG_MAX_LEN);
+
 
     while (1) {
+        char* messageRx = (char*)malloc(MSG_MAX_LEN);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
-        recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
-        char* messageToSave = strdup(messageRx); 
+        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN-1, 0, (struct sockaddr*) &sinRemote, &sin_len);
+        //char* messageToSave = strdup(messageRx); 
         //printf("Message received: %s\n", messageRx);
-        List_append(display_list, messageToSave);
+        messageRx[byteReceived] = '\0';
+        List_append(display_list, messageRx);
 
         pthread_mutex_lock(&receiveMutex);
         {
@@ -98,9 +100,9 @@ void* sendThread(void* args) {
             
             // fgets(messageTx, MSG_MAX_LEN, stdin);
 
-            if (strcmp(messageTx, "q\n") == 0) {
-                break;
-            }
+            // if (strcmp(messageTx, "q\n") == 0) {
+            //     break;
+            // }
 
             struct addrinfo hints, *res;
             memset(&hints, 0, sizeof(hints));
@@ -138,8 +140,8 @@ void* screenOutputThread(void* args) {
         printf("\nReceived: ");
         char* message = (char*)List_trim(display_list);
         if (message) {
-            fputs(message, stdout);
             fputs("\n", stdout);
+            fputs(message, stdout);
             free(message); // Free the memory after displaying the message
         }
     }
