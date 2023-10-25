@@ -27,12 +27,11 @@ static pthread_mutex_t sendMutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 int socketDescriptor1, socketDescriptor2;
-void* keyboardInputThread(void* args) {
-   
+void* keyboardInputThread(void* args) { 
     char* message = (char*)malloc(MSG_MAX_LEN);
     while (1) {
 
-
+        printf("Enter a message to send (or type 'q' to quit): ");
         fgets(message, MSG_MAX_LEN, stdin);
         char* messageToSave = strdup(message); 
         List_append(send_list, messageToSave);
@@ -58,17 +57,16 @@ void* keyboardInputThread(void* args) {
     return NULL;
 }
 
-void* receiveThread(void* args) {
+void* receiveThread(void* args) {   
     int socketDescriptor = *((int*)args);
     // char messageRx[MSG_MAX_LEN];
     char* messageRx = (char*)malloc(MSG_MAX_LEN);
 
     while (1) {
-        char* messageToSave = strdup(messageRx); 
-        //char* message = (char*)List_trim(send_list);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
         recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
+        char* messageToSave = strdup(messageRx); 
         //printf("Message received: %s\n", messageRx);
         List_append(display_list, messageToSave);
 
@@ -83,20 +81,23 @@ void* receiveThread(void* args) {
 }
 
 void* sendThread(void* args) {
+   
     int socketDescriptor = *((int*)args);
 
     while (1) {
 
         pthread_mutex_lock(&sendMutex);
         {
-            pthread_cond_wait(&sendCondVar, &sendMutex);
+            while (List_count(send_list) == 0){
+                pthread_cond_wait(&sendCondVar, &sendMutex);
+            }
+                
         }
         pthread_mutex_unlock(&sendMutex);
 
         // char messageTx[MSG_MAX_LEN];
         char* messageTx = (char*)List_trim(send_list);
-        if (messageTx) {
-            printf("Enter a message to send (or type 'q' to quit): ");
+            
             // fgets(messageTx, MSG_MAX_LEN, stdin);
 
             if (strcmp(messageTx, "q\n") == 0) {
@@ -120,7 +121,7 @@ void* sendThread(void* args) {
 
             sendto(socketDescriptor, messageTx, strlen(messageTx), 0, (struct sockaddr*) &sinRemote, sizeof(sinRemote));
             free(messageTx); // Free the memory after sending the message
-        }
+
 
     }
 
@@ -131,6 +132,7 @@ void* sendThread(void* args) {
 }
 
 void* screenOutputThread(void* args) {
+   
     while (1) {
 
         pthread_mutex_lock(&receiveMutex);
@@ -167,18 +169,19 @@ int main() {
 
 
     pthread_t receiveThreadPID1, sendThreadPID1, keyboard_thread, screen_output;
-    pthread_create(&keyboard_thread, NULL, keyboardInputThread, NULL);
-    pthread_create(&sendThreadPID1, NULL, sendThread, &socketDescriptor1);
 
     
+    pthread_create(&sendThreadPID1, NULL, sendThread, &socketDescriptor1); 
     pthread_create(&receiveThreadPID1, NULL, receiveThread, &socketDescriptor1);
     pthread_create(&screen_output, NULL, screenOutputThread, NULL);
+    pthread_create(&keyboard_thread, NULL, keyboardInputThread, NULL);
+    
+    
 
 
-    pthread_join(sendThreadPID1, NULL);
-    pthread_cancel(receiveThreadPID1);
-    pthread_join(receiveThreadPID1, NULL);
     pthread_join(keyboard_thread, NULL);
+    pthread_join(sendThreadPID1, NULL);
+    pthread_join(receiveThreadPID1, NULL);
     pthread_join(screen_output, NULL);
 
     
