@@ -5,30 +5,44 @@
 #ifndef _LIST_H_
 #define _LIST_H_
 #include <stdbool.h>
+#include "stdio.h"
 
 #define LIST_SUCCESS 0
 #define LIST_FAIL -1
 
+
+
 typedef struct Node_s Node;
 struct Node_s {
-    void* item;
-    Node * next;
-    Node * prev;    
+
+    void * value;
+    Node * pointerNext;
+    Node * pointerBack;
 };
+
 
 enum ListOutOfBounds {
     LIST_OOB_START,
-    LIST_OOB_END
+    LIST_OOB_END,
+    NO
 };
+
+
 typedef struct List_s List;
 struct List_s{
-    enum ListOutOfBounds OOB;
-    int length;
+
     Node * head;
+    Node * end;
     Node * current;
-    Node * tail;
+    enum ListOutOfBounds currentOut;
+    List * nextList;
+    List * prevList;
+    int nodes_num;
 };
-void populateStacks();
+
+
+
+
 // Maximum number of unique lists the system can support
 // (You may modify this, but reset the value to 10 when handing in your assignment)
 #define LIST_MAX_NUM_HEADS 10
@@ -36,6 +50,14 @@ void populateStacks();
 // Maximum total number of nodes (statically allocated) to be shared across all lists
 // (You may modify this, but reset the value to 100 when handing in your assignment)
 #define LIST_MAX_NUM_NODES 100
+
+
+
+
+
+
+
+
 
 // General Error Handling:
 // Client code is assumed never to call these functions with a NULL List pointer, or 
@@ -46,6 +68,8 @@ void populateStacks();
 // Returns a NULL pointer on failure.
 List* List_create();
 
+
+
 // Returns the number of items in pList.
 int List_count(List* pList);
 
@@ -55,7 +79,7 @@ void* List_first(List* pList);
 
 // Returns a pointer to the last item in pList and makes the last item the current item.
 // Returns NULL and sets current item to NULL if list is empty.
-void* List_last(List* pList); 
+void* List_last(List* pList);
 
 // Advances pList's current item by one, and returns a pointer to the new current item.
 // If this operation advances the current item beyond the end of the pList, a NULL pointer 
@@ -69,7 +93,7 @@ void* List_prev(List* pList);
 
 // Returns a pointer to the current item in pList.
 void* List_curr(List* pList);
-
+                                         
 // Adds the new item to pList directly after the current item, and makes item the current item. 
 // If the current pointer is before the start of the pList, the item is added at the start. If 
 // the current pointer is beyond the end of the pList, the item is added at the end. 
@@ -109,7 +133,7 @@ void List_concat(List* pList1, List* pList2);
 // pList and all its nodes no longer exists after the operation; its head and nodes are 
 // available for future operations.
 typedef void (*FREE_FN)(void* pItem);
-void List_free(List* pList, FREE_FN pItemFreeFn);
+void List_free(List* pList, FREE_FN pItemFreeFn); 
 
 // Search pList, starting at the current item, until the end is reached or a match is found. 
 // In this context, a match is determined by the comparator parameter. This parameter is a

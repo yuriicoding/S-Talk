@@ -1,394 +1,656 @@
 #include "list.h"
-#include <stdio.h>
-#include <assert.h> 
+#include "stdio.h"
 
-static List heads[LIST_MAX_NUM_HEADS];
-static Node nodes[LIST_MAX_NUM_NODES];
-static int headsStack[LIST_MAX_NUM_HEADS];
-static int nodesStack[LIST_MAX_NUM_NODES];
-static int nodeIndex = -1;
-static int headIndex = -1;
-static bool areStacksPopulated = false;
+typedef struct List_m List_manager;
+struct List_m {
+    List * head;
+    List * end;
+    List * current;
+    int free_heads;
+};
 
-void populateStacks()
-{
-    for (int i = LIST_MAX_NUM_HEADS-1; i >= 0; i--)
-    {
-        headIndex++;
-        headsStack[headIndex] = i;
+
+static Node nodeArray[LIST_MAX_NUM_NODES];
+static List headsArray[LIST_MAX_NUM_HEADS];
+
+static List vacantNodes;
+static List_manager vacantHeads;
+
+static bool init_vacant = false;
+
+
+// Debugging tool used to print the whole list
+
+// static void printList(List * pList){
+//     Node * start = pList->head;
+
+//     while (start!=0){
+//         printf("%p\n", start);
+//         start = start->pointerNext;
+//     }
+// }
+
+
+static void initEmptyHeads(){
+
+    vacantHeads.free_heads = 0;
+    vacantHeads.head = &(headsArray[0]);
+    List * firstAdded = vacantHeads.head;
+    firstAdded->prevList = 0;
+    firstAdded->nextList = &(headsArray[1]);
+    vacantHeads.free_heads = vacantHeads.free_heads + 1;
+
+    for (int i = 1; i <= LIST_MAX_NUM_HEADS - 2; i++){
+
+        List * list_to_add = &(headsArray[i]);
+        list_to_add->nextList = &(headsArray[i+1]);
+        list_to_add->prevList = &(headsArray[i-1]);
+        vacantHeads.free_heads = vacantHeads.free_heads + 1;    
+
     }
-    for (int i = LIST_MAX_NUM_NODES-1; i >= 0; i--)
-    {
-        nodeIndex++;
-        nodesStack[nodeIndex] = i;
+
+    vacantHeads.end = &(headsArray[LIST_MAX_NUM_HEADS-1]);
+    List * lastAdded = vacantHeads.end;
+    lastAdded->nextList = 0;
+    lastAdded->prevList = &(headsArray[LIST_MAX_NUM_HEADS-2]);
+    vacantHeads.free_heads = vacantHeads.free_heads + 1;
+
+}
+
+
+static void initEmptyNodes(){
+
+    vacantNodes.nodes_num = 0;
+    vacantNodes.head = &(nodeArray[0]);
+    Node * firstAdded = vacantNodes.head;
+    firstAdded->pointerBack = 0;
+    firstAdded->pointerNext = &(nodeArray[1]);
+    vacantNodes.nodes_num = vacantNodes.nodes_num + 1;
+
+    for (int i = 1; i <= LIST_MAX_NUM_NODES - 2; i++){
+
+        Node * node_to_add = &(nodeArray[i]);
+        node_to_add->pointerBack = &(nodeArray[i-1]);
+        node_to_add->pointerNext = &(nodeArray[i+1]);
+        vacantNodes.nodes_num = vacantNodes.nodes_num + 1;
+
     }
-    areStacksPopulated = true;
+
+    vacantNodes.end = &(nodeArray[LIST_MAX_NUM_NODES-1]);
+    Node * lastAdded = vacantNodes.end;
+    lastAdded->pointerNext = 0;
+    lastAdded->pointerBack = &(nodeArray[LIST_MAX_NUM_NODES-2]);
+    vacantNodes.nodes_num = vacantNodes.nodes_num + 1;
+
+}
+
+
+static Node * getVacantNode(){
+    if (vacantNodes.nodes_num != 0){
+
+        Node * nodeToAdd = vacantNodes.end;
+        vacantNodes.nodes_num = vacantNodes.nodes_num - 1;
+
+        //if it was last vacant node
+        if (vacantNodes.nodes_num == 0){
+            vacantNodes.head = 0;
+            vacantNodes.end = 0;
+        }
+
+        //if it wasn't last vacant node
+        else{
+            Node * prev_empty_node = nodeToAdd->pointerBack;
+            vacantNodes.end = prev_empty_node;
+            prev_empty_node->pointerNext = 0;
+        }
+
+        return nodeToAdd;
+
+    }
+    else{
+        return 0;
+    }
 }
 
 
 
-List* List_create()
-{
-    if(!areStacksPopulated)
-        populateStacks();
-    if (headIndex == - 1)
-        return NULL;
-    //head
-    int index = headsStack[headIndex];
-    headIndex--;
-    List* newList = &heads[index];
-    newList->head = NULL;
-    newList->current = NULL;
-    newList->tail = NULL;
-    newList->length = 0;
+static void returnNodeToVacant(Node * pNode){
 
-    return newList;
-}
-// Return last item and take it out of pList. Make the new last item the current one.
-// Return NULL if pList is initially empty.
-void* List_trim(List* pList)
-{
-    assert(pList != NULL);
-    if(pList->length == 0)
-        return NULL;
-    void* item = pList->tail->item;
-    int indexToPush = pList->tail - nodes;
-    nodeIndex++;
-    nodesStack[nodeIndex] = indexToPush;
+    Node * nodeToReturn = pNode;
     
-    pList->tail = pList->tail->prev;
-    if(pList->tail != pList->head)
-    {
-        pList->tail->next = NULL;
-        pList->current = pList->tail;
+    if (vacantNodes.nodes_num == 0){
+        vacantNodes.head = nodeToReturn;
+        nodeToReturn->pointerBack = 0;
     }
-    else
-    {
-        pList->head = NULL;
-        pList->head = NULL;
-        pList->current = NULL;
+    else{
+
+        Node * lastVacantNode = vacantNodes.end;
+        nodeToReturn->pointerBack = lastVacantNode;
+        lastVacantNode->pointerNext = nodeToReturn;
     }
 
-    pList->length--;
-    // pList->tail->next = NULL;
-    // pList->current->item = pList->tail->item;
+    vacantNodes.nodes_num = vacantNodes.nodes_num + 1;
+    nodeToReturn->pointerNext = 0;
+    vacantNodes.end = nodeToReturn;
 
-    return item;
-}
+};
 
 
-// Returns the number of items in pList.
-int List_count(List* pList)
-{
-    assert(pList != NULL);
-    return pList->length;
-}
+List* List_create(){
 
-// Returns a pointer to the first item in pList and makes the first item the current item.
-// Returns NULL and sets current item to NULL if list is empty.
-void* List_first(List* pList)
-{
-    assert(pList != NULL);
-    if(pList->length == 0)
-        pList->current = NULL;
-    else 
-        pList->current = pList->head;
-    return pList->head->item;
-}
-
-// Returns a pointer to the last item in pList and makes the last item the current item.
-// Returns NULL and sets current item to NULL if list is empty.
-void* List_last(List* pList)
-{
-    assert(pList != NULL);
-    if(pList->length == 0)
-    {
-        pList->current = NULL;
-        return NULL;
-    }   
-    else 
-        pList->current = pList->tail;
-    return pList->current->item;
-}
-
-// Advances pList's current item by one, and returns a pointer to the new current item.
-// If this operation advances the current item beyond the end of the pList, a NULL pointer 
-// is returned and the current item is set to be beyond end of pList.
-void* List_next(List* pList)
-{
-    assert(pList != NULL);
-    if(pList->length == 0)
-        return NULL;
-    if((pList->current == NULL && pList->OOB == LIST_OOB_END) || pList->current==pList->tail)
-    {
-        pList->OOB = LIST_OOB_END;
-        pList->current = NULL;
-        return NULL;
+    if (init_vacant == false){
+        initEmptyHeads();
+        initEmptyNodes();
+        init_vacant = true;
     }
-    if(pList->current == NULL && pList->OOB == LIST_OOB_START)
-    {
-        pList->current = pList->head;
-        return pList->current->item;
-    }
-    pList->current = pList->current->next;
-    return pList->current->item;
-}
 
-// Backs up pList's current item by one, and returns a pointer to the new current item. 
-// If this operation backs up the current item beyond the start of the pList, a NULL pointer 
-// is returned and the current item is set to be before the start of pList.
-void* List_prev(List* pList)
-{    
-    assert(pList != NULL);
-    if(pList->length == 0)
-        return NULL;
-    if((pList->current == NULL && pList->OOB == LIST_OOB_START) || pList->current==pList->head)
-    {
-        pList->OOB = LIST_OOB_START;
-        pList->current = NULL;
-        return NULL;
-    }
-    if(pList->current == NULL && pList->OOB == LIST_OOB_END)
-    {
-        pList->current = pList->tail;
-        return pList->current->item;
-    }
-    pList->current = pList->current->prev;
-    return pList->current->item;
-}
+    if (vacantHeads.head != 0){
 
-// Returns a pointer to the current item in pList.
-void* List_curr(List* pList)
-{
-    assert(pList != NULL);
-    if(pList->current == NULL)
-        return NULL;
-    return pList->current->item;
-}
+        List * new_list = vacantHeads.end;
+        new_list->nodes_num = 0;
+        new_list->current = 0;
+        new_list->head = 0;
+        new_list->end = 0;
+        new_list->currentOut = LIST_OOB_START;
 
-// Adds the new item to pList directly after the current item, and makes item the current item. 
-// If the current pointer is before the start of the pList, the item is added at the start. If 
-// the current pointer is beyond the end of the pList, the item is added at the end. 
-// Returns 0 on success, -1 on failure.
-int List_insert_after(List* pList, void* pItem)
-{
-    assert(pList != NULL);
-    if(nodeIndex == -1)
-        return LIST_FAIL;
-    Node* nodeToInsert = &nodes[nodesStack[nodeIndex]];
-    nodeToInsert->next = NULL;
-    nodeToInsert->prev = NULL;
-    nodeToInsert->item = pItem;
-    nodeIndex--;
-    if(pList->length == 0)
-    {
-        pList->head = nodeToInsert;
-        pList->tail = nodeToInsert;
-        nodeToInsert->next = NULL;
-        nodeToInsert->prev = NULL;
-    }
-    else if(pList->current == NULL)
-    {
-        if(pList->OOB == LIST_OOB_START)
-        {
-            nodeToInsert->next = pList->head;
-            nodeToInsert->prev = NULL;
-            pList->head->prev = nodeToInsert;
-            pList->head = nodeToInsert;
+        if (vacantHeads.free_heads == 1){
+            vacantHeads.head = 0;
+            vacantHeads.end = 0;
+            vacantHeads.free_heads = vacantHeads.free_heads - 1;
         }
-        else if(pList->OOB == LIST_OOB_END)
-        {
-            nodeToInsert->next = NULL;
-            nodeToInsert->prev = pList->tail;
-            pList->tail->next = nodeToInsert;
-            pList->tail = nodeToInsert;
+        else {
+            List * prev_empty_list = new_list->prevList;
+            vacantHeads.end = prev_empty_list;
+            prev_empty_list->nextList = 0;
+            vacantHeads.free_heads = vacantHeads.free_heads - 1;
         }
-    }
-    else 
-    {
-        if(pList->current == pList->tail)
-        {
-            pList->tail = nodeToInsert;
-        }
-        nodeToInsert->next = pList->current->next;
-        nodeToInsert->prev = pList->current;
-        pList->current->next = nodeToInsert;
-        if(nodeToInsert->next != NULL)
-        {
-            nodeToInsert->next->prev = nodeToInsert;
-        }
-    }
 
-    pList->length++;
-    pList->current = nodeToInsert;
-    return LIST_SUCCESS;
-}
-
-// Adds item to pList directly before the current item, and makes the new item the current one. 
-// If the current pointer is before the start of the pList, the item is added at the start. 
-// If the current pointer is beyond the end of the pList, the item is added at the end. 
-// Returns 0 on success, -1 on failure.
-int List_insert_before(List* pList, void* pItem)
-{
-    assert(pList!=NULL);
-    List_prev(pList);
-    return List_insert_after(pList,pItem);
-}
-
-// Adds item to the end of pList, and makes the new item the current one. 
-// Returns 0 on success, -1 on failure.
-int List_append(List* pList, void* pItem)
-{
-    assert(pList!=NULL);
-    pList->current = pList->tail;
-    return List_insert_after(pList, pItem);
-}
-
-// Adds item to the front of pList, and makes the new item the current one. 
-// Returns 0 on success, -1 on failure.
-int List_prepend(List* pList, void* pItem)
-{
-    assert(pList!=NULL);
-    pList->current = pList->head;
-    return List_insert_before(pList, pItem);
-}
-
-// Return current item and take it out of pList. Make the next item the current one.
-// If the current pointer is before the start of the pList, or beyond the end of the pList,
-// then do not change the pList and return NULL.
-void* List_remove(List* pList)
-{
-    assert(pList!=NULL);
-    if(pList->length == 0 || pList->current == NULL)
-        return NULL;
-
-    void* item = pList->current->item;
-
-    Node* currentNode = pList->current;
-
-    if(currentNode == pList->tail)
-    {
-        pList->tail = pList->tail->prev;
-        pList->OOB = LIST_OOB_END;
-    }
-    if(currentNode == pList->head)
-    {
-        pList->head = pList->head->next;
-    }
-    if(currentNode->prev != NULL)
-    {
-        currentNode->prev->next = currentNode->next;
-    }
-    if(currentNode->next != NULL)
-    {
-        currentNode->next->prev = currentNode->prev;
-    }
-
-    pList->current = currentNode->next;
-    int indexToPush = currentNode - nodes;
-    nodeIndex++;
-    nodesStack[nodeIndex] = indexToPush;
-    
-    pList->length--;
-    return item;
-}
-
-// Adds pList2 to the end of pList1. The current pointer is set to the current pointer of pList1. 
-// pList2 no longer exists after the operation; its head is available
-// for future operations.
-void List_concat(List* pList1, List* pList2)
-{
-    assert(pList1!=NULL && pList2!=NULL);
-    if(pList1->length == 0 && pList2->length != 0)
-    {
-        pList1->head = pList2->head;
-        pList1->tail = pList2->tail;
-        pList2->length = pList2->length;
-    }   
-    else if(pList1->length != 0 && pList2->length != 0)
-    {
-        pList1->tail->next = pList2->head;
-        pList2->head->prev = pList1->tail;
-        pList1->tail = pList2->tail;
-        pList1->length += pList2->length;
-    }
-
-    int indexToPushList = pList2 - heads;
-    headIndex++;
-    headsStack[headIndex] = indexToPushList;
-    pList2->OOB = LIST_OOB_START;
-    pList2->current = NULL;
-    pList2->head = NULL;
-    pList2->tail = NULL;
-    pList2->length = 0;
-}
-
-
-
-// Delete pList. pItemFreeFn is a pointer to a routine that frees an item. 
-// It should be invoked (within List_free) as: (*pItemFreeFn)(itemToBeFreedFromNode);
-// pList and all its nodes no longer exists after the operation; its head and nodes are 
-// available for future operations.
-typedef void (*FREE_FN)(void* pItem);
-void List_free(List* pList, FREE_FN pItemFreeFn)
-{
-    assert(pList != NULL);
-    Node* currentNode = pList->head;
-    while (currentNode != NULL)
-    {
-        (*pItemFreeFn)(currentNode->item);
+        return new_list;
         
-        int indexToPush = currentNode - nodes;
-        nodeIndex++;
-        nodesStack[nodeIndex] = indexToPush;
-
-        currentNode = currentNode->next;
     }
-    int indexToPushList = pList - heads;
-    headIndex++;
-    headsStack[headIndex] = indexToPushList;
-    
-    pList->OOB = LIST_OOB_START;
-    pList->current = NULL;
-    pList->head = NULL;
-    pList->tail = NULL;
-    pList->length = 0;
+
+    else{
+        return 0;
+    }
 }
 
-// Search pList, starting at the current item, until the end is reached or a match is found. 
-// In this context, a match is determined by the comparator parameter. This parameter is a
-// pointer to a routine that takes as its first argument an item pointer, and as its second 
-// argument pComparisonArg. Comparator returns 0 if the item and comparisonArg don't match, 
-// or 1 if they do. Exactly what constitutes a match is up to the implementor of comparator. 
-// 
-// If a match is found, the current pointer is left at the matched item and the pointer to 
-// that item is returned. If no match is found, the current pointer is left beyond the end of 
-// the list and a NULL pointer is returned.
-// 
-// If the current pointer is before the start of the pList, then start searching from
-// the first node in the list (if any).
-typedef bool (*COMPARATOR_FN)(void* pItem, void* pComparisonArg);
-void* List_search(List* pList, COMPARATOR_FN pComparator, void* pComparisonArg)
-{    
-    assert(pList != NULL);
-    if (pList->length == 0)
-    {
-        return NULL;
+
+int List_count(List* pList){
+    return pList->nodes_num;
+}
+
+
+void* List_first(List* pList){
+    if (pList->head == 0){
+        pList->current = 0;
+        pList->currentOut = LIST_OOB_START;
+        return 0;
     }
-    if (pList->current == NULL && pList->OOB == LIST_OOB_END)
-        return NULL;
-    if (pList->current == NULL && pList->OOB == LIST_OOB_START)
-        List_next(pList);
-    while (pList->current != NULL)
-    {
-        if ( (*pComparator)(pList->current->item, pComparisonArg) )
-        {
-            return pList->current->item;
+    else{
+        pList->current = pList->head;
+        pList->currentOut = NO;
+        void * item = pList->current->value;
+        return item;
+    }
+}
+
+
+void* List_last(List* pList){
+    if (pList->end == 0){
+        pList->current = 0;
+        pList->currentOut = LIST_OOB_START;
+        return 0;
+    }
+    else{
+        pList->current = pList->end;
+        pList->currentOut = NO;  
+        void * item = pList->current->value;
+        return item;
+    }
+}
+
+
+void* List_next(List* pList){
+    if (pList->nodes_num != 0){
+    if (pList->currentOut == LIST_OOB_START){
+        pList->current = pList->head;
+        pList->currentOut = NO;
+        void * item = pList->current->value;
+        return item;
+    }
+    else if (pList->currentOut == LIST_OOB_END || pList->current == pList->end){
+        pList->current = 0;
+        pList->currentOut = LIST_OOB_END;
+        return 0;
+    }
+    else{
+        pList->current = pList->current->pointerNext;
+        void * item = pList->current->value;
+        return item;
+    }
+    }
+    else{
+        return 0;
+    }
+};
+
+
+void* List_prev(List* pList){
+    if (pList->nodes_num != 0){
+    if (pList->currentOut == LIST_OOB_END){
+        pList->current = pList->end;
+        pList->currentOut = NO;
+        void * item = pList->current->value;
+        return item;
+    }
+    else if (pList->currentOut == LIST_OOB_START || pList->current == pList->head){
+        pList->current = 0;
+        pList->currentOut = LIST_OOB_START;
+        return 0;
+    }
+    else{
+        pList->current = pList->current->pointerBack;
+        void * item = pList->current->value;
+        return item;
+    }
+    }
+    else{
+        return 0;
+    }
+};
+
+
+void* List_curr(List* pList){
+    if (pList->currentOut == NO){
+        void * item = pList->current->value;
+        return item;
+    }
+    else{
+        return 0;
+    }
+};
+
+
+
+int List_insert_after(List* pList, void* pItem){
+    
+    if (vacantNodes.nodes_num != 0){
+        if (pList->currentOut == LIST_OOB_END){
+            List_append(pList, pItem);
         }
-    
+        else if (pList->currentOut == LIST_OOB_START){
+            List_prepend(pList, pItem);
+        }
+        else if (pList->current == pList->end){
+            List_append(pList, pItem);
+        }
+        else{
 
-        pList->current = pList->current->next;
+            Node * nodeToAdd = getVacantNode();
+            pList->nodes_num = pList->nodes_num + 1;
+
+            Node * currentNode = pList->current;
+            Node * afterCurrent = currentNode->pointerNext;
+
+            currentNode->pointerNext = nodeToAdd;
+            nodeToAdd->pointerBack = currentNode;
+            afterCurrent->pointerBack = nodeToAdd;
+            nodeToAdd->pointerNext = afterCurrent;
+
+            pList->current = nodeToAdd;
+            nodeToAdd->value = pItem;
+
+        }
+
+        return 0;
+
     }
-    pList->OOB = LIST_OOB_END;
-    return NULL;
+    else{
+        return -1;
+    }
 }
+
+
+
+int List_insert_before(List* pList, void* pItem){
+    
+    if (vacantNodes.nodes_num != 0){
+        if (pList->currentOut == LIST_OOB_END){
+            List_append(pList, pItem);
+        }
+        else if (pList->currentOut == LIST_OOB_START){
+            List_prepend(pList, pItem);
+        }
+        else if (pList->current == pList->head){
+            List_prepend(pList, pItem);
+        }
+        else{
+
+            Node * nodeToAdd = getVacantNode();
+            pList->nodes_num = pList->nodes_num + 1;
+
+            Node * currentNode = pList->current;
+            Node * beforeCurrent = currentNode->pointerBack;
+
+            currentNode->pointerBack = nodeToAdd;
+            nodeToAdd->pointerNext = currentNode;
+            beforeCurrent->pointerNext = nodeToAdd;
+            nodeToAdd->pointerBack = beforeCurrent;
+
+            pList->current = nodeToAdd;
+            nodeToAdd->value = pItem;
+
+        }
+
+        return 0;
+
+    }
+    else{
+        return -1;
+    }
+}
+
+
+
+int List_append(List* pList, void* pItem){
+    
+    Node * nodeToAdd = getVacantNode();
+
+    if (nodeToAdd != 0){
+        
+        //if it will be first node in the list
+        if (pList->nodes_num == 0){
+            pList->head = nodeToAdd;
+            nodeToAdd->pointerBack = 0;
+            nodeToAdd->pointerNext = 0; 
+        }
+
+        //if it will be 2+ node in the list
+        else{
+            Node * prev_node = pList->end;
+            prev_node->pointerNext = nodeToAdd;
+            nodeToAdd->pointerBack = prev_node;
+            nodeToAdd->pointerNext = 0;
+        }
+
+        nodeToAdd->value = pItem;
+        pList->nodes_num = pList->nodes_num + 1;
+        pList->end = nodeToAdd;
+        pList->current = nodeToAdd;
+        pList->currentOut = NO; 
+
+        return 0;
+    }
+    else{
+        return -1;
+    }  
+}
+
+
+
+int List_prepend(List* pList, void* pItem){
+
+        Node * nodeToAdd = getVacantNode();
+
+        if (nodeToAdd != 0){
+        
+        //if it will be first node in the list
+        if (pList->nodes_num == 0){
+            pList->end = nodeToAdd;
+            nodeToAdd->pointerBack = 0;
+            nodeToAdd->pointerNext = 0; 
+        }
+
+        //if it will be 2+ node in the list
+        else{
+            Node * next_node = pList->head;
+            next_node->pointerBack = nodeToAdd;
+            nodeToAdd->pointerNext = next_node;
+            nodeToAdd->pointerBack = 0;
+        }
+
+        nodeToAdd->value = pItem;
+        pList->nodes_num = pList->nodes_num + 1;
+        pList->head = nodeToAdd;
+        pList->current = nodeToAdd;
+        pList->currentOut = NO;   
+
+        return 0;
+    }
+    else{
+        return -1;
+    }
+
+}
+
+
+void* List_remove(List* pList){
+
+    if (pList->nodes_num != 0 && pList->currentOut == NO){
+        
+        Node * nodeToRemove = pList->current;
+        void * item = pList->current->value;
+
+        if (pList->nodes_num == 1){
+            pList->current = 0;
+            pList->currentOut = LIST_OOB_END;
+            pList->head = 0;
+            pList->end = 0;
+        }
+
+        else if (nodeToRemove == pList->end){
+            Node * secondLast = nodeToRemove->pointerBack;
+            pList->current = 0;
+            pList->currentOut = LIST_OOB_END;
+            pList->end = secondLast;
+            secondLast->pointerNext = 0;
+        }
+
+        else if (nodeToRemove == pList->head){
+            Node * second = nodeToRemove->pointerNext;
+            second->pointerBack = 0;
+            pList->head = second;
+            pList->current = second;
+        }
+
+        else{
+            Node * beforeCurrent = nodeToRemove->pointerBack;
+            Node * afterCurrent = nodeToRemove->pointerNext;
+            beforeCurrent->pointerNext = afterCurrent;
+            afterCurrent->pointerBack = beforeCurrent;
+
+            pList->current = afterCurrent;
+        }
+
+        returnNodeToVacant(nodeToRemove);
+        pList->nodes_num = pList->nodes_num - 1;
+        return item;
+
+
+    }
+    else{
+        return 0;
+    }
+
+};
+
+
+
+void* List_trim(List* pList){
+
+    if (pList->nodes_num != 0){
+        
+        Node * nodeToDelete = pList->end;
+        void * item = nodeToDelete->value;
+
+        if (pList->nodes_num == 1){
+            pList->head = 0;
+            pList->end = 0;
+            pList->current = 0;
+            pList->currentOut = LIST_OOB_START;
+        }
+        else{
+            Node * secondLast = nodeToDelete->pointerBack;
+            secondLast->pointerNext = 0;
+            pList->end = secondLast;
+            pList->current = secondLast;
+            pList->currentOut = NO;
+            
+        }
+
+        pList->nodes_num = pList->nodes_num - 1;
+        returnNodeToVacant(nodeToDelete);
+
+        return item;
+
+    }
+    else{
+        return 0;
+    }
+}
+
+void List_concat(List* pList1, List* pList2){
+    if (pList2->nodes_num != 0){
+
+        if (pList1->nodes_num == 0){
+            pList1->head = pList2->head;
+            pList1->end = pList2->end;
+            pList1->nodes_num = pList1->nodes_num + pList2->nodes_num;
+        }
+        else{
+            Node * end_list1 = pList1->end;
+            Node * start_list2 = pList2->head;
+
+            end_list1->pointerNext = start_list2;
+            start_list2->pointerBack = end_list1;
+            pList1->end = pList2->end;
+            pList1->nodes_num = pList1->nodes_num + pList2->nodes_num;
+        }
+
+        
+
+    }
+        
+        List * listToAdd = pList2;
+        
+
+        if (vacantHeads.free_heads != 0){
+        List * lastList = vacantHeads.end;
+        listToAdd->prevList = lastList;
+        lastList->nextList = listToAdd;
+        listToAdd->nextList = 0;
+        vacantHeads.end = listToAdd;
+        }
+
+        else{
+            listToAdd->nextList = 0;
+            listToAdd->prevList = 0;
+            vacantHeads.head = listToAdd;
+            vacantHeads.end = listToAdd;
+        }
+
+        vacantHeads.free_heads = vacantHeads.free_heads + 1;
+
+        //Making sure user won't be able to access anything after freeing this list
+        listToAdd->head = 0;
+        listToAdd->end = 0;
+        listToAdd->current = 0;
+        listToAdd->nodes_num = 0;
+        listToAdd->currentOut = LIST_OOB_START;
+
+};
+
+void List_free(List* pList, FREE_FN pItemFreeFn){
+    if (pList->nodes_num != 0){
+
+        Node * start = pList->head;
+
+        while (start != 0){
+            void * item = start->value;
+            (*pItemFreeFn)(item);
+            start = start->pointerNext;
+        }
+
+        Node * firstNode = pList->head;
+        Node * lastNode = pList->end;
+
+        if (vacantNodes.nodes_num != 0){
+        Node * lastVacantNode = vacantNodes.end;
+
+        lastVacantNode->pointerNext = firstNode;
+        firstNode->pointerBack = lastVacantNode;
+        lastNode->pointerNext = 0;
+        vacantNodes.end = lastNode;
+        }
+
+        else{
+            vacantNodes.head = firstNode;
+            vacantNodes.end = lastNode;
+            lastNode->pointerNext = 0;
+            firstNode->pointerBack = 0;
+        }
+
+        vacantNodes.nodes_num = vacantNodes.nodes_num + pList->nodes_num;
+    }
+
+        List * listToAdd = pList;
+        
+
+        if (vacantHeads.free_heads != 0){
+        List * lastList = vacantHeads.end;
+        listToAdd->prevList = lastList;
+        lastList->nextList = listToAdd;
+        listToAdd->nextList = 0;
+        vacantHeads.end = listToAdd;
+        }
+
+        else{
+            listToAdd->nextList = 0;
+            listToAdd->prevList = 0;
+            vacantHeads.head = listToAdd;
+            vacantHeads.end = listToAdd;
+        }
+        vacantHeads.free_heads = vacantHeads.free_heads + 1;
+
+        //Making sure user won't be able to access anything after freeing this list
+        listToAdd->head = 0;
+        listToAdd->end = 0;
+        listToAdd->current = 0;
+        listToAdd->nodes_num = 0;
+        listToAdd->currentOut = LIST_OOB_START;
+
+};
+
+void* List_search(List* pList, COMPARATOR_FN pComparator, void* pComparisonArg){
+    if (pList->nodes_num != 0 || pList->currentOut != LIST_OOB_END){
+
+        if (pList->currentOut == LIST_OOB_START){
+            pList->currentOut = NO;
+            pList->current = pList->head;
+        }
+
+        Node * node_with_match = 0;
+
+        while (pList->current != 0){
+            void * item_to_check = pList->current->value;
+
+            bool check_result = (*pComparator)(item_to_check, pComparisonArg);
+
+            if (check_result == 1){
+                node_with_match = pList->current;
+                void * found = node_with_match->value;
+                return found;
+            }
+
+            pList->current = pList->current->pointerNext;
+        }
+
+        pList->currentOut = LIST_OOB_END;
+        return 0;
+    }
+    else{
+
+        return 0;
+    }
+};
+

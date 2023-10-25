@@ -22,9 +22,20 @@ int socketDescriptor1, socketDescriptor2;
 void* keyboardInputThread(void* args) {
     char* message = (char*)malloc(MSG_MAX_LEN);
 
+
     while (1) {
         fgets(message, MSG_MAX_LEN, stdin);
         List_append(send_list, message);
+
+        Node* iter = send_list->head;
+        while (iter != NULL){
+            //printf("Something");
+            char* item_val = (char*)iter->value;
+            printf("%s\n", item_val);
+            iter = iter->pointerNext;
+            
+        }
+
     }
 
     return NULL;
@@ -70,7 +81,7 @@ void* sendThread(void* args) {
 
         
             struct sockaddr_in sinRemote;
-            getaddrinfo("asb9838nu-e08",NULL, &hints, &res);
+            getaddrinfo("asb9838nu-e07",NULL, &hints, &res);
             memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
             // sinRemote.sin_family = AF_INET;
             // inet_pton(AF_INET, , &sinRemote.sin_addr);
@@ -123,18 +134,22 @@ int main() {
     sin2.sin_port = htons(PORT2);
     bind(socketDescriptor2, (struct sockaddr*)&sin2, sizeof(sin2));
 
-    pthread_t receiveThreadPID1, sendThreadPID1, receiveThreadPID2, sendThreadPID2;
+    pthread_t receiveThreadPID1, sendThreadPID1, receiveThreadPID2, sendThreadPID2, keyboard_thread, screen_output;
+    pthread_create(&keyboard_thread, NULL, keyboardInputThread, NULL);
+    pthread_create(&screen_output, NULL, screenOutputThread, NULL);
     pthread_create(&receiveThreadPID1, NULL, receiveThread, &socketDescriptor1);
     pthread_create(&sendThreadPID1, NULL, sendThread, &socketDescriptor1);
     pthread_create(&receiveThreadPID2, NULL, receiveThread, &socketDescriptor2);
     pthread_create(&sendThreadPID2, NULL, sendThread, &socketDescriptor2);
 
+    pthread_join(keyboard_thread, NULL);
     pthread_join(sendThreadPID1, NULL);
     pthread_cancel(receiveThreadPID1);
     pthread_join(receiveThreadPID1, NULL);
     pthread_join(sendThreadPID2, NULL);
     pthread_cancel(receiveThreadPID2);
     pthread_join(receiveThreadPID2, NULL);
+    pthread_join(screen_output, NULL);
 
     printf("Done\n");
     List_free(send_list, free);
