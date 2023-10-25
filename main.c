@@ -8,22 +8,40 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "List.h"
 
 #define MSG_MAX_LEN 1024
 #define PORT1 6001
 #define PORT2 6060
 
+List* send_list;
+List* display_list;
+
+
 int socketDescriptor1, socketDescriptor2;
+void* keyboardInputThread(void* args) {
+    char* message = (char*)malloc(MSG_MAX_LEN);
+
+    while (1) {
+        fgets(message, MSG_MAX_LEN, stdin);
+        List_append(send_list, message);
+    }
+
+    return NULL;
+}
 
 void* receiveThread(void* args) {
     int socketDescriptor = *((int*)args);
     char messageRx[MSG_MAX_LEN];
 
     while (1) {
+        //char* message = (char*)List_trim(send_list);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
         recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
-        printf("Message received: %s\n", messageRx);
+        //printf("Message received: %s\n", messageRx);
+        //free(messageRx); // Free the memory after sending the message
+        List_append(display_list, messageRx);
     }
 
     return NULL;
@@ -33,30 +51,35 @@ void* sendThread(void* args) {
     int socketDescriptor = *((int*)args);
 
     while (1) {
-        char messageTx[MSG_MAX_LEN];
-        printf("Enter a message to send (or type 'q' to quit): ");
-        fgets(messageTx, MSG_MAX_LEN, stdin);
+        // char messageTx[MSG_MAX_LEN];
+        char* messageTx = (char*)List_trim(send_list);
+        if (messageTx) {
+            printf("Enter a message to send (or type 'q' to quit): ");
+            fgets(messageTx, MSG_MAX_LEN, stdin);
 
-        if (strcmp(messageTx, "q\n") == 0) {
-            break;
+            if (strcmp(messageTx, "q\n") == 0) {
+                break;
+            }
+
+            struct addrinfo hints, *res;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_DGRAM;
+            
+            
+
+        
+            struct sockaddr_in sinRemote;
+            getaddrinfo("asb9838nu-e08",NULL, &hints, &res);
+            memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
+            // sinRemote.sin_family = AF_INET;
+            // inet_pton(AF_INET, , &sinRemote.sin_addr);
+            sinRemote.sin_port = htons(socketDescriptor == socketDescriptor1 ? PORT2 : PORT1);
+
+            sendto(socketDescriptor, messageTx, strlen(messageTx), 0, (struct sockaddr*) &sinRemote, sizeof(sinRemote));
+            free(messageTx); // Free the memory after sending the message
         }
 
-        struct addrinfo hints, *res;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_DGRAM;
-        
-        
-
-      
-        struct sockaddr_in sinRemote;
-        getaddrinfo("asb9838nu-e08",NULL, &hints, &res);
-        memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
-        // sinRemote.sin_family = AF_INET;
-        // inet_pton(AF_INET, , &sinRemote.sin_addr);
-        sinRemote.sin_port = htons(socketDescriptor == socketDescriptor1 ? PORT2 : PORT1);
-
-        sendto(socketDescriptor, messageTx, strlen(messageTx), 0, (struct sockaddr*) &sinRemote, sizeof(sinRemote));
     }
 
     close(socketDescriptor);
@@ -65,8 +88,22 @@ void* sendThread(void* args) {
     return NULL;
 }
 
+void* screenOutputThread(void* args) {
+    while (1) {
+        char* message = (char*)List_trim(display_list);
+        if (message) {
+            printf("%s", message);
+            free(message); // Free the memory after displaying the message
+        }
+    }
+
+    return NULL;
+}
+
 int main() {
     printf("Starting...\n");
+    send_list = List_create();
+    display_list = List_create();
 
     // Create sockets for communication
     socketDescriptor1 = socket(PF_INET, SOCK_DGRAM, 0);
@@ -100,6 +137,9 @@ int main() {
     pthread_join(receiveThreadPID2, NULL);
 
     printf("Done\n");
+    List_free(send_list, free);
+    List_free(display_list, free);
+
 
     return 0;
 }
