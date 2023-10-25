@@ -20,21 +20,23 @@ List* display_list;
 
 int socketDescriptor1, socketDescriptor2;
 void* keyboardInputThread(void* args) {
+   
     char* message = (char*)malloc(MSG_MAX_LEN);
-
-
     while (1) {
+
+
         fgets(message, MSG_MAX_LEN, stdin);
-        List_append(send_list, message);
+        char* messageToSave = strdup(message); 
+        List_append(send_list, messageToSave);
 
         Node* iter = send_list->head;
-        while (iter != NULL){
-            //printf("Something");
-            char* item_val = (char*)iter->value;
-            printf("%s\n", item_val);
-            iter = iter->pointerNext;
+        // while (iter != NULL){
+        //     //printf("Something");
+        //     char* item_val = (char*)iter->value;
+        //     printf("%s\n", item_val);
+        //     iter = iter->pointerNext;
             
-        }
+        // }
 
     }
 
@@ -43,16 +45,17 @@ void* keyboardInputThread(void* args) {
 
 void* receiveThread(void* args) {
     int socketDescriptor = *((int*)args);
-    char messageRx[MSG_MAX_LEN];
+    // char messageRx[MSG_MAX_LEN];
+    char* messageRx = (char*)malloc(MSG_MAX_LEN);
 
     while (1) {
+        char* messageToSave = strdup(messageRx); 
         //char* message = (char*)List_trim(send_list);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
         recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
         //printf("Message received: %s\n", messageRx);
-        //free(messageRx); // Free the memory after sending the message
-        List_append(display_list, messageRx);
+        List_append(display_list, messageToSave);
     }
 
     return NULL;
@@ -66,7 +69,7 @@ void* sendThread(void* args) {
         char* messageTx = (char*)List_trim(send_list);
         if (messageTx) {
             printf("Enter a message to send (or type 'q' to quit): ");
-            fgets(messageTx, MSG_MAX_LEN, stdin);
+            // fgets(messageTx, MSG_MAX_LEN, stdin);
 
             if (strcmp(messageTx, "q\n") == 0) {
                 break;
