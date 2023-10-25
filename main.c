@@ -11,8 +11,8 @@
 #include "list.h"
 
 #define MSG_MAX_LEN 1024
-#define PORT1 6001
-#define PORT2 6060
+#define PORT1 6060
+#define PORT2 6001
 
 List* send_list;
 List* display_list;
@@ -37,7 +37,7 @@ void* keyboardInputThread(void* args) {
         char* messageToSave = strdup(message); 
         List_append(send_list, messageToSave);
 
-        Node* iter = send_list->head;
+        //Node* iter = send_list->head;
         // while (iter != NULL){
         //     //printf("Something");
         //     char* item_val = (char*)iter->value;
@@ -156,43 +156,35 @@ int main() {
 
     // Create sockets for communication
     socketDescriptor1 = socket(PF_INET, SOCK_DGRAM, 0);
-    socketDescriptor2 = socket(PF_INET, SOCK_DGRAM, 0);
 
     // Bind sockets to the respective ports
-    struct sockaddr_in sin1, sin2;
+    struct sockaddr_in sin1;
     memset(&sin1, 0, sizeof(sin1));
     sin1.sin_family = AF_INET;
     sin1.sin_addr.s_addr = htonl(INADDR_ANY);
     sin1.sin_port = htons(PORT1);
     bind(socketDescriptor1, (struct sockaddr*)&sin1, sizeof(sin1));
 
-    memset(&sin2, 0, sizeof(sin2));
-    sin2.sin_family = AF_INET;
-    sin2.sin_addr.s_addr = htonl(INADDR_ANY);
-    sin2.sin_port = htons(PORT2);
-    bind(socketDescriptor2, (struct sockaddr*)&sin2, sizeof(sin2));
 
-    pthread_t receiveThreadPID1, sendThreadPID1, receiveThreadPID2, sendThreadPID2, keyboard_thread, screen_output;
+    pthread_t receiveThreadPID1, sendThreadPID1, keyboard_thread, screen_output;
     pthread_create(&keyboard_thread, NULL, keyboardInputThread, NULL);
-    pthread_create(&screen_output, NULL, screenOutputThread, NULL);
-    pthread_create(&receiveThreadPID1, NULL, receiveThread, &socketDescriptor1);
     pthread_create(&sendThreadPID1, NULL, sendThread, &socketDescriptor1);
-    pthread_create(&receiveThreadPID2, NULL, receiveThread, &socketDescriptor2);
-    pthread_create(&sendThreadPID2, NULL, sendThread, &socketDescriptor2);
 
-    pthread_join(keyboard_thread, NULL);
+    
+    pthread_create(&receiveThreadPID1, NULL, receiveThread, &socketDescriptor1);
+    pthread_create(&screen_output, NULL, screenOutputThread, NULL);
+
+
     pthread_join(sendThreadPID1, NULL);
     pthread_cancel(receiveThreadPID1);
     pthread_join(receiveThreadPID1, NULL);
-    pthread_join(sendThreadPID2, NULL);
-    pthread_cancel(receiveThreadPID2);
-    pthread_join(receiveThreadPID2, NULL);
+    pthread_join(keyboard_thread, NULL);
     pthread_join(screen_output, NULL);
 
-    printf("Done\n");
+    
     List_free(send_list, free);
     List_free(display_list, free);
 
-
+    printf("Done\n");
     return 0;
 }
