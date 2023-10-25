@@ -17,6 +17,14 @@
 List* send_list;
 List* display_list;
 
+//Receive Condition Variables
+static pthread_cond_t receiveCondVar = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t receiveMutex = PTHREAD_MUTEX_INITIALIZER;
+
+//Send Condition Variables
+static pthread_cond_t sendCondVar = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t sendMutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 int socketDescriptor1, socketDescriptor2;
 void* keyboardInputThread(void* args) {
@@ -38,6 +46,13 @@ void* keyboardInputThread(void* args) {
             
         // }
 
+
+        pthread_mutex_lock(&sendMutex);
+        {
+            pthread_cond_signal(&sendCondVar);
+        }
+        pthread_mutex_unlock(&sendMutex);
+
     }
 
     return NULL;
@@ -56,6 +71,12 @@ void* receiveThread(void* args) {
         recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
         //printf("Message received: %s\n", messageRx);
         List_append(display_list, messageToSave);
+
+        pthread_mutex_lock(&receiveMutex);
+        {
+            pthread_cond_signal(&receiveCondVar);
+        }
+        pthread_mutex_unlock(&receiveMutex);
     }
 
     return NULL;
@@ -65,6 +86,13 @@ void* sendThread(void* args) {
     int socketDescriptor = *((int*)args);
 
     while (1) {
+
+        pthread_mutex_lock(&sendMutex);
+        {
+            pthread_cond_wait(&sendCondVar, &sendMutex);
+        }
+        pthread_mutex_unlock(&sendMutex);
+
         // char messageTx[MSG_MAX_LEN];
         char* messageTx = (char*)List_trim(send_list);
         if (messageTx) {
@@ -104,6 +132,13 @@ void* sendThread(void* args) {
 
 void* screenOutputThread(void* args) {
     while (1) {
+
+        pthread_mutex_lock(&receiveMutex);
+        {
+            pthread_cond_wait(&receiveCondVar, &receiveMutex);
+        }
+        pthread_mutex_unlock(&receiveMutex);
+
         char* message = (char*)List_trim(display_list);
         if (message) {
             printf("%s", message);
