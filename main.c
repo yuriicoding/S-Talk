@@ -14,7 +14,7 @@
 unsigned short PORT1;
 unsigned short PORT2;
 char* hostName;
-
+bool isExit = false;
 
 List* send_list;
 List* display_list;
@@ -37,10 +37,7 @@ void* keyboardInputThread(void* args) {
         fgets(message, MSG_MAX_LEN, stdin);
         char* messageToSave = strdup(message); 
         fputs("\n", stdout);
-        if(strncmp(messageToSave, "!", 1)== 0 && strlen(messageToSave) == 2) {
-            fputs("Terminating the dialog...\n", stdout);
-            exit(0);
-        }
+ 
         List_append(send_list, messageToSave);
 
         pthread_mutex_lock(&sendMutex);
@@ -48,6 +45,9 @@ void* keyboardInputThread(void* args) {
             pthread_cond_signal(&sendCondVar);
         }
         pthread_mutex_unlock(&sendMutex);
+        if(strncmp(messageToSave, "!", 1)== 0 && strlen(messageToSave) == 2) {
+            isExit = true;
+        }
 
     }
 
@@ -63,10 +63,10 @@ void* receiveThread(void* args) {
         char* messageRx = (char*)malloc(MSG_MAX_LEN);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
-        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
+        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN-1, 0, (struct sockaddr*) &sinRemote, &sin_len);
         //char* messageToSave = strdup(messageRx); 
         //printf("Message received: %s\n", messageRx);
-        // messageRx[byteReceived] = '\0';
+        messageRx[byteReceived] = '\0';
         List_append(display_list, messageRx);
 
         pthread_mutex_lock(&receiveMutex);
@@ -117,7 +117,11 @@ void* sendThread(void* args) {
                 perror("Sending failed");
             }
             free(messageTx); // Free the memory after sending the message
-
+            if(isExit)
+            {
+                fputs("Terminating the dialog...", stdout);
+                exit(0);
+            }
 
     }
 
@@ -140,7 +144,7 @@ void* screenOutputThread(void* args) {
             fputs(message, stdout);
             fputs("\n", stdout);
             if(strncmp(message, "!", 1)== 0 && strlen(message) == 2) {
-                fputs("Terminating the dialog...", stdout);
+                fputs("Terminating the dialog...\n", stdout);
                 exit(0);
             }
             free(message); // Free the memory after displaying the message
@@ -168,7 +172,7 @@ int main(int argc, char *argv[]) {
     socketDescriptor1 = socket(PF_INET, SOCK_DGRAM, 0);
     if (socketDescriptor1 == -1) {
         perror("Socket creation failed");
-        exit(EXIT_FAILURE);
+        exit(0);
     }
 
 
@@ -183,7 +187,7 @@ int main(int argc, char *argv[]) {
     int binding_result = bind(socketDescriptor1, (struct sockaddr*)&sin1, sizeof(sin1));
     //Check binding
     if (binding_result == -1){
-        printf("Port binding failed. Exiting the program...");
+        printf("Port binding failed. Exiting the program...\n");
         exit(0);
     }
 
