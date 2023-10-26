@@ -1,7 +1,7 @@
-all: x
+all: s-talk
 
-x: main.o list.o 
-	g++ -Wall -o x main.o list.o -lpthread
+s-talk: main.o list.o 
+	g++ -Wall -o s-talk main.o list.o -lpthread
 	
 main.o: main.c list.h
 	g++ -Wall -o main.o -c main.c 
@@ -10,4 +10,4 @@ list.o: list.h list.c
 	g++ -Wall -c list.c
 	
 clean:
-	rm -f x main.o list.o
+	rm -f s-talk main.o list.o
