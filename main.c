@@ -15,7 +15,7 @@ unsigned short PORT1;
 unsigned short PORT2;
 char* hostName;
 int socketDescriptor1;
-
+bool isExit = false;
 
 List* send_list;
 List* display_list;
@@ -62,10 +62,12 @@ void* keyboardInputThread(void* args) {
         fgets(message, MSG_MAX_LEN, stdin);
         char* messageToSave = strdup(message); 
         fputs("\n", stdout);
+        
         if(strncmp(messageToSave, "!", 1)== 0 && strlen(messageToSave) == 2) {
             fputs("Terminating the dialog...\n", stdout);
             closeAndExit();
         }
+
         List_append(send_list, messageToSave);
 
         pthread_mutex_lock(&sendMutex);
@@ -73,6 +75,9 @@ void* keyboardInputThread(void* args) {
             pthread_cond_signal(&sendCondVar);
         }
         pthread_mutex_unlock(&sendMutex);
+        if(strncmp(messageToSave, "!", 1)== 0 && strlen(messageToSave) == 2) {
+            isExit = true;
+        }
 
     }
 
@@ -88,10 +93,10 @@ void* receiveThread(void* args) {
         char* messageRx = (char*)malloc(MSG_MAX_LEN);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
-        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
+        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN-1, 0, (struct sockaddr*) &sinRemote, &sin_len);
         //char* messageToSave = strdup(messageRx); 
         //printf("Message received: %s\n", messageRx);
-        // messageRx[byteReceived] = '\0';
+        messageRx[byteReceived] = '\0';
         List_append(display_list, messageRx);
 
         pthread_mutex_lock(&receiveMutex);
@@ -142,7 +147,11 @@ void* sendThread(void* args) {
                 perror("Sending failed");
             }
             free(messageTx); // Free the memory after sending the message
-
+            if(isExit)
+            {
+                fputs("Terminating the dialog...", stdout);
+                closeAndExit();
+            }
 
     }
 
