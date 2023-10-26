@@ -43,12 +43,14 @@ void closeAndExit(){
 
 
 void* keyboardInputThread(void* args) { 
-    char* message = (char*)malloc(MSG_MAX_LEN);
+    //char* message = (char*)malloc(MSG_MAX_LEN);
+    char message[MSG_MAX_LEN];
     while (1) {
 
         
         fgets(message, MSG_MAX_LEN, stdin);
-        char* messageToSave = strdup(message); 
+        char messageToSave[MSG_MAX_LEN];
+        strcpy(messageToSave, message);
         fputs("\n", stdout);
 
         List_append(send_list, messageToSave);
@@ -73,7 +75,8 @@ void* receiveThread(void* args) {
 
 
     while (1) {
-        char* messageRx = (char*)malloc(MSG_MAX_LEN);
+        //char* messageRx = (char*)malloc(MSG_MAX_LEN);
+        char messageRx[MSG_MAX_LEN];
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
         int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN-1, 0, (struct sockaddr*) &sinRemote, &sin_len);
@@ -128,7 +131,7 @@ void* sendThread(void* args) {
             {
                 perror("Sending failed");
             }
-            free(messageTx); // Free the memory after sending the message
+            freeaddrinfo(res);
             if(isExit)
             {
                 fputs("Terminating the dialog...", stdout);
@@ -159,7 +162,6 @@ void* screenOutputThread(void* args) {
                 fputs("Terminating the dialog...", stdout);
                 closeAndExit();
             }
-            free(message); // Free the memory after displaying the message
         }
     }
 
