@@ -102,13 +102,20 @@ void* sendThread(void* args) {
             
 
             struct sockaddr_in sinRemote; //cs-srye4013ue02
-            getaddrinfo(hostName,NULL, &hints, &res);
+            if (getaddrinfo(hostName,NULL, &hints, &res) != 0)
+            {
+                perror("Address resolution failed");
+                exit(0);
+            }
             memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
             // sinRemote.sin_family = AF_INET;
             // inet_pton(AF_INET, , &sinRemote.sin_addr);
             sinRemote.sin_port = htons(PORT2); //socketDescriptor == socketDescriptor1 ? PORT2 : PORT1);
 
-            sendto(socketDescriptor, messageTx, strlen(messageTx), 0, (struct sockaddr*) &sinRemote, sizeof(sinRemote));
+            if (sendto(socketDescriptor, messageTx, strlen(messageTx), 0, (struct sockaddr*) &sinRemote, sizeof(sinRemote)) == -1)
+            {
+                perror("Sending failed");
+            }
             free(messageTx); // Free the memory after sending the message
 
 
@@ -159,6 +166,11 @@ int main(int argc, char *argv[]) {
 
     // Create sockets for communication
     socketDescriptor1 = socket(PF_INET, SOCK_DGRAM, 0);
+    if (socketDescriptor1 == -1) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
 
     // Bind sockets to the respective ports
     struct sockaddr_in sin1;
