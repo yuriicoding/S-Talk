@@ -10,7 +10,7 @@
 #include <netdb.h>
 #include "list.h"
 
-#define MSG_MAX_LEN 4
+#define MSG_MAX_LEN 1024
 unsigned short PORT1;
 unsigned short PORT2;
 char* hostName;
@@ -64,9 +64,10 @@ void* receiveThread(void* args) {
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
         int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
+        printf("%d", byteReceived);
         //char* messageToSave = strdup(messageRx); 
         //printf("Message received: %s\n", messageRx);
-        messageRx[byteReceived] = '\0';
+        // messageRx[byteReceived] = '\0';
         List_append(display_list, messageRx);
 
         pthread_mutex_lock(&receiveMutex);
