@@ -10,7 +10,7 @@
 #include <netdb.h>
 #include "list.h"
 
-#define MSG_MAX_LEN 4
+#define MSG_MAX_LEN 1025
 unsigned short PORT1;
 unsigned short PORT2;
 char* hostName;
@@ -63,7 +63,7 @@ void* receiveThread(void* args) {
         char* messageRx = (char*)malloc(MSG_MAX_LEN);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
-        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
+        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN-1, 0, (struct sockaddr*) &sinRemote, &sin_len);
         //char* messageToSave = strdup(messageRx); 
         //printf("Message received: %s\n", messageRx);
         messageRx[byteReceived] = '\0';
@@ -166,7 +166,14 @@ int main(int argc, char *argv[]) {
     sin1.sin_family = AF_INET;
     sin1.sin_addr.s_addr = htonl(INADDR_ANY);
     sin1.sin_port = htons(PORT1);
-    bind(socketDescriptor1, (struct sockaddr*)&sin1, sizeof(sin1));
+
+
+    int binding_result = bind(socketDescriptor1, (struct sockaddr*)&sin1, sizeof(sin1));
+    //Check binding
+    if (binding_result == -1){
+        printf("Port binding failed. Exiting the program...");
+        exit(0);
+    }
 
 
     pthread_t receiveThreadPID1, sendThreadPID1, keyboard_thread, screen_output;
