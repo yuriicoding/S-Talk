@@ -33,24 +33,12 @@ pthread_t receiveThreadPID1, sendThreadPID1, keyboard_thread, screen_output;
 
 void closeAndExit(){
 
+        // Cancel all threads
     pthread_cancel(keyboard_thread);
     pthread_cancel(sendThreadPID1);
     pthread_cancel(receiveThreadPID1);
     pthread_cancel(screen_output);
 
-    pthread_join(keyboard_thread, NULL);
-    pthread_join(sendThreadPID1, NULL);
-    pthread_join(receiveThreadPID1, NULL);
-    pthread_join(screen_output, NULL);
-
-    close(socketDescriptor1);
-
-    List_free(send_list, free);
-    List_free(display_list, free);
-
-    fputs("Done\n", stdout);
-
-    exit(EXIT_FAILURE);
 }
 
 
@@ -62,11 +50,6 @@ void* keyboardInputThread(void* args) {
         fgets(message, MSG_MAX_LEN, stdin);
         char* messageToSave = strdup(message); 
         fputs("\n", stdout);
-        
-        if(strncmp(messageToSave, "!", 1)== 0 && strlen(messageToSave) == 2) {
-            fputs("Terminating the dialog...\n", stdout);
-            closeAndExit();
-        }
 
         List_append(send_list, messageToSave);
 
@@ -117,8 +100,7 @@ void* sendThread(void* args) {
 
         pthread_mutex_lock(&sendMutex);
         {
-                pthread_cond_wait(&sendCondVar, &sendMutex);
-                
+                pthread_cond_wait(&sendCondVar, &sendMutex);           
         }
         pthread_mutex_unlock(&sendMutex);
 
@@ -135,7 +117,7 @@ void* sendThread(void* args) {
             if (getaddrinfo(hostName,NULL, &hints, &res) != 0)
             {
                 perror("Address resolution failed");
-                closeAndExit();
+                exit(0);
             }
             memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
             // sinRemote.sin_family = AF_INET;
@@ -190,7 +172,7 @@ int main(int argc, char *argv[]) {
     if (argc != 4)
     {
         fputs("Wrong input. Usage: %s <PORT1 Remote_Machine_Name PORT2>\n", stdout);
-        closeAndExit();
+        exit(0);
     }
     PORT1 = (unsigned short) atoi(argv[1]);
     hostName = argv[2];
@@ -204,7 +186,7 @@ int main(int argc, char *argv[]) {
     socketDescriptor1 = socket(PF_INET, SOCK_DGRAM, 0);
     if (socketDescriptor1 == -1) {
         perror("Socket creation failed");
-        closeAndExit();
+        exit(0);
     }
 
 
@@ -220,7 +202,7 @@ int main(int argc, char *argv[]) {
     //Check binding
     if (binding_result == -1){
         printf("Port binding failed. Exiting the program...");
-        closeAndExit();
+        exit(0);
     }
     
 
@@ -229,8 +211,19 @@ int main(int argc, char *argv[]) {
     pthread_create(&receiveThreadPID1, NULL, receiveThread, &socketDescriptor1);
     pthread_create(&screen_output, NULL, screenOutputThread, NULL);
     pthread_create(&keyboard_thread, NULL, keyboardInputThread, NULL);
-    
 
-    
+
+    pthread_join(keyboard_thread, NULL);
+    pthread_join(sendThreadPID1, NULL);
+    pthread_join(receiveThreadPID1, NULL);
+    pthread_join(screen_output, NULL);
+
+    close(socketDescriptor1);
+
+    List_free(send_list, free);
+    List_free(display_list, free);
+
+    fputs("Done\n", stdout);
+
     return 0;
 }
