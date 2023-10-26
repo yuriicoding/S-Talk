@@ -10,9 +10,11 @@
 #include <netdb.h>
 #include "list.h"
 
-#define MSG_MAX_LEN 1024
-#define PORT1 6001
-#define PORT2 6060
+#define MSG_MAX_LEN 4
+unsigned short PORT1;
+unsigned short PORT2;
+char* hostName;
+
 
 List* send_list;
 List* display_list;
@@ -34,17 +36,12 @@ void* keyboardInputThread(void* args) {
         
         fgets(message, MSG_MAX_LEN, stdin);
         char* messageToSave = strdup(message); 
+        fputs("\n", stdout);
+        if(strncmp(messageToSave, "!", 1)== 0 && strlen(messageToSave) == 2) {
+            fputs("Terminating the dialog...\n", stdout);
+            exit(0);
+        }
         List_append(send_list, messageToSave);
-
-        //Node* iter = send_list->head;
-        // while (iter != NULL){
-        //     //printf("Something");
-        //     char* item_val = (char*)iter->value;
-        //     printf("%s\n", item_val);
-        //     iter = iter->pointerNext;
-            
-        // }
-
 
         pthread_mutex_lock(&sendMutex);
         {
@@ -66,7 +63,7 @@ void* receiveThread(void* args) {
         char* messageRx = (char*)malloc(MSG_MAX_LEN);
         struct sockaddr_in sinRemote;
         unsigned int sin_len = sizeof(sinRemote);
-        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN-1, 0, (struct sockaddr*) &sinRemote, &sin_len);
+        int byteReceived = recvfrom(socketDescriptor, messageRx, MSG_MAX_LEN, 0, (struct sockaddr*) &sinRemote, &sin_len);
         //char* messageToSave = strdup(messageRx); 
         //printf("Message received: %s\n", messageRx);
         messageRx[byteReceived] = '\0';
@@ -97,27 +94,19 @@ void* sendThread(void* args) {
 
         // char messageTx[MSG_MAX_LEN];
         char* messageTx = (char*)List_trim(send_list);
-            
-            // fgets(messageTx, MSG_MAX_LEN, stdin);
-
-            // if (strcmp(messageTx, "q\n") == 0) {
-            //     break;
-            // }
 
             struct addrinfo hints, *res;
             memset(&hints, 0, sizeof(hints));
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_DGRAM;
             
-            
 
-        
-            struct sockaddr_in sinRemote;
-            getaddrinfo("cs-srye4013ue02",NULL, &hints, &res);
+            struct sockaddr_in sinRemote; //cs-srye4013ue02
+            getaddrinfo(hostName,NULL, &hints, &res);
             memcpy(&sinRemote, res->ai_addr, res->ai_addrlen);
             // sinRemote.sin_family = AF_INET;
             // inet_pton(AF_INET, , &sinRemote.sin_addr);
-            sinRemote.sin_port = htons(socketDescriptor == socketDescriptor1 ? PORT2 : PORT1);
+            sinRemote.sin_port = htons(PORT2); //socketDescriptor == socketDescriptor1 ? PORT2 : PORT1);
 
             sendto(socketDescriptor, messageTx, strlen(messageTx), 0, (struct sockaddr*) &sinRemote, sizeof(sinRemote));
             free(messageTx); // Free the memory after sending the message
@@ -137,11 +126,16 @@ void* screenOutputThread(void* args) {
             pthread_cond_wait(&receiveCondVar, &receiveMutex);
         }
         pthread_mutex_unlock(&receiveMutex);
-        printf("\nReceived: ");
+
+        fputs("Received: ", stdout);
         char* message = (char*)List_trim(display_list);
         if (message) {
-            fputs("\n", stdout);
             fputs(message, stdout);
+            fputs("\n", stdout);
+            if(strncmp(message, "!", 1)== 0 && strlen(message) == 2) {
+                fputs("Terminating the dialog...", stdout);
+                exit(0);
+            }
             free(message); // Free the memory after displaying the message
         }
     }
@@ -149,8 +143,17 @@ void* screenOutputThread(void* args) {
     return NULL;
 }
 
-int main() {
-    printf("Starting...\n");
+int main(int argc, char *argv[]) {
+    if (argc != 4)
+    {
+        fputs("Wrong input. Usage: %s <PORT1 Remote_Machine_Name PORT2>\n", stdout);
+        exit(0);
+    }
+    PORT1 = (unsigned short) atoi(argv[1]);
+    hostName = argv[2];
+    PORT2 = (unsigned short) atoi(argv[3]);
+    fputs("Starting the dialog...\n", stdout);
+
     send_list = List_create();
     display_list = List_create();
 
@@ -188,6 +191,6 @@ int main() {
     List_free(send_list, free);
     List_free(display_list, free);
 
-    printf("Done\n");
+    fputs("Done\n", stdout);
     return 0;
 }
